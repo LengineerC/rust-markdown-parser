@@ -81,12 +81,6 @@ impl Parser {
         })
     }
 
-    fn parse_paragraph(&self, line: &str) -> Block {
-        Block::Paragraph {
-            children: vec![Inline::Text(line.to_string())],
-        }
-    }
-
     fn is_thematic_break(&self, line: &str) -> bool {
         if line.len() < 3 {
             return false;

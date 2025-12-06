@@ -145,6 +145,7 @@ impl HtmlRenderer {
                 let content = Self::render_inlines(children);
                 format!("<del>{}</del>", content)
             }
+            Inline::RawHtml(html) => html.clone(),
         }
     }
 

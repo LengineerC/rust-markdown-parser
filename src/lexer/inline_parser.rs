@@ -20,6 +20,35 @@ impl InlineParser {
         while self.pos < self.input.len() {
             let current_char = self.input[self.pos];
 
+            // 处理转义
+            if current_char == '\\' {
+                if let Some(next_char) = self.peek_char() {
+                    if Self::is_special_char(next_char) {
+                        self.flush_text(&mut inlines, &mut text_buffer);
+                        text_buffer.push(next_char);
+                        self.pos += 2;
+                        continue;
+                    }
+                }
+                text_buffer.push('\\');
+                self.pos += 1;
+                continue;
+            }
+
+            // HTML
+            if current_char == '<' {
+                self.flush_text(&mut inlines, &mut text_buffer);
+
+                if let Some(html_code) = self.try_parse_html_tag() {
+                    inlines.push(html_code);
+                    continue;
+                } else {
+                    text_buffer.push('<');
+                    self.pos += 1;
+                    continue;
+                }
+            }
+
             // Image
             if current_char == '!' && self.peek_char() == Some('[') {
                 self.flush_text(&mut inlines, &mut text_buffer);
@@ -90,21 +119,42 @@ impl InlineParser {
         inlines
     }
 
+    fn is_special_char(c: char) -> bool {
+        matches!(
+            c,
+            '\\' | '`'
+                | '*'
+                | '_'
+                | '{'
+                | '}'
+                | '['
+                | ']'
+                | '('
+                | ')'
+                | '#'
+                | '+'
+                | '-'
+                | '.'
+                | '!'
+                | '|'
+                | '>'
+                | '~'
+        )
+    }
+
     // 解析*和**
     fn try_parse_emphasis(&mut self) -> Option<Inline> {
         let start_pos = self.pos;
 
-        // 确定*字符个数
         let delimiter_count = self.count_delimiter('*');
 
-        if delimiter_count > 2 {
+        // 修改点 A: 允许最多 3 个 (即 ***)
+        if delimiter_count > 3 {
             self.pos = start_pos;
             return None;
-
-            todo!("只处理*为1和2，待处理*>2的情况");
         }
 
-        // 处理*闭合
+        // 2. 处理 * 闭合
         let content_start = start_pos + delimiter_count;
         let mut current_search_pos = content_start;
 
@@ -112,32 +162,33 @@ impl InlineParser {
             if self.input[current_search_pos] == '*' {
                 let mut close_count = 0;
                 let mut temp_pos = current_search_pos;
-
                 while temp_pos < self.input.len() && self.input[temp_pos] == '*' {
                     close_count += 1;
                     temp_pos += 1;
                 }
 
                 if close_count == delimiter_count {
-                    // 前后*个数相匹配
-
+                    // 前后 * 个数相匹配
                     let content_str: String = self.input[content_start..current_search_pos]
                         .iter()
                         .collect();
 
                     // 递归下降分析中间内容
-                    let mut childer_parser = InlineParser::new(&content_str);
-                    let children = childer_parser.parse();
+                    let mut child_parser = InlineParser::new(&content_str);
+                    let children = child_parser.parse();
 
                     self.pos = temp_pos;
 
-                    if delimiter_count == 1 {
-                        return Some(Inline::Emphasis(children));
-                    } else {
-                        return Some(Inline::Strong(children));
+                    match delimiter_count {
+                        1 => return Some(Inline::Emphasis(children)),
+                        2 => return Some(Inline::Strong(children)),
+                        3 => {
+                            let inner_emph = Inline::Emphasis(children);
+                            return Some(Inline::Strong(vec![inner_emph]));
+                        }
+                        _ => return None,
                     }
                 }
-
                 current_search_pos = temp_pos;
             } else {
                 current_search_pos += 1;
@@ -293,7 +344,7 @@ impl InlineParser {
             return None;
         }
 
-        let mut content_start = start_pos + delimiter_count;
+        let content_start = start_pos + delimiter_count;
         let mut cur_search_pos = content_start;
 
         while cur_search_pos < self.input.len() {
@@ -325,5 +376,45 @@ impl InlineParser {
 
         self.pos = start_pos;
         None
+    }
+
+    fn try_parse_html_tag(&mut self) -> Option<Inline> {
+        let start_pos = self.pos;
+
+        if self.input[self.pos] != '<' {
+            return None;
+        }
+
+        let mut end_pos = start_pos + 1;
+        while end_pos < self.input.len() {
+            if self.input[end_pos] == '>' {
+                break;
+            }
+            end_pos += 1;
+        }
+
+        if end_pos >= self.input.len() {
+            return None; // 没有闭合的 >
+        }
+
+        let tag_content: String = self.input[start_pos..=end_pos].iter().collect();
+
+        // 4. 简单验证看起来像不像标签
+        // 规则：< 后面必须紧跟字母、/ 或 ! (注释 <!--)
+        if tag_content.len() < 3 {
+            return None;
+        }
+        let second_char = tag_content.chars().nth(1).unwrap();
+        if !second_char.is_alphanumeric()
+            && second_char != '/'
+            && second_char != '!'
+            && second_char != '?'
+        {
+            return None;
+        }
+
+        // 5. 成功
+        self.pos = end_pos + 1;
+        Some(Inline::RawHtml(tag_content))
     }
 }

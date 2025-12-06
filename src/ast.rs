@@ -7,6 +7,7 @@ pub enum Inline {
     Image { alt: String, url: String },
     CodeSpan(String),
     Strikethrough(Vec<Inline>),
+    RawHtml(String),
 }
 
 #[derive(Debug, Clone)]

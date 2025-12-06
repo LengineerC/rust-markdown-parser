@@ -44,7 +44,7 @@ impl ListParser {
         }
 
         let trimmed = line.trim();
-        let (is_ordered, content_start) = self.parse_list_marker(trimmed)?;
+        let (is_ordered, _) = self.parse_list_marker(trimmed)?;
 
         let mut items = Vec::new();
 
