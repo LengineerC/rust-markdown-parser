@@ -171,7 +171,72 @@ impl Parser {
         lines.clear();
     }
 
+    fn is_table_delimiter(&self, line: &str) -> bool {
+        let trimmed_line = line.trim();
+        if !trimmed_line.contains('-') {
+            return false;
+        }
+        trimmed_line
+            .chars()
+            .all(|c| c == '|' || c == '-' || c == ':' || c == ' ')
+    }
+
+    fn parse_table_alignments(&self, line: &str) -> Vec<Alignment> {
+        let parts = self.split_table_row(line);
+
+        parts
+            .into_iter()
+            .map(|part| {
+                let s = part.trim();
+                let start_with_colon = s.starts_with(':');
+                let end_with_colon = s.ends_with(':');
+
+                if start_with_colon && end_with_colon {
+                    Alignment::Center
+                } else if end_with_colon {
+                    Alignment::Right
+                } else if start_with_colon {
+                    Alignment::Left
+                } else {
+                    Alignment::None
+                }
+            })
+            .collect()
+    }
+
+    fn split_table_row(&self, line: &str) -> Vec<String> {
+        let trimmed_line = line.trim();
+        let content = if trimmed_line.starts_with('|') {
+            &trimmed_line[1..]
+        } else {
+            trimmed_line
+        };
+
+        let content = if content.ends_with('|') {
+            &content[..content.len() - 1]
+        } else {
+            content
+        };
+
+        content.split('|').map(|s| s.to_string()).collect()
+    }
+
+    fn parse_table_row(&self, line: &str) -> Vec<Vec<Inline>> {
+        let parts = self.split_table_row(line);
+        parts
+            .into_iter()
+            .map(|part| {
+                let content = part.trim();
+                let mut parser = InlineParser::new(content);
+                parser.parse()
+            })
+            .collect()
+    }
+
     fn parse_blocks(&mut self) -> Vec<Block> {
+        let lines: Vec<&str> = self.input.lines().collect();
+        let mut idx = 0;
+
         let mut blocks = Vec::new();
         let mut cur_paragraph_lines: Vec<String> = Vec::new();
 
@@ -186,7 +251,8 @@ impl Parser {
         // list
         let mut cur_list_lines: Vec<String> = Vec::new();
 
-        for line in self.input.lines() {
+        while idx < lines.len() {
+            let line = lines[idx];
             let trimmed_line = line.trim();
 
             // === CodeBlock ===
@@ -202,6 +268,8 @@ impl Parser {
                 } else {
                     cur_code_lines.push(line.to_string());
                 }
+
+                idx += 1;
                 continue;
             }
 
@@ -211,23 +279,73 @@ impl Parser {
                 if !cur_quoto_lines.is_empty() {
                     self.flush_blockquote(&mut blocks, &mut cur_quoto_lines);
                 }
+                if !cur_list_lines.is_empty() {
+                    self.flush_list_block(&mut blocks, &mut cur_list_lines);
+                }
+
                 in_code_block = true;
                 language = trimmed_line
                     .strip_prefix("```")
                     .unwrap_or("")
                     .trim()
                     .to_string();
+
+                idx += 1;
                 continue;
+            }
+
+            // === Table ===
+            if trimmed_line.contains('|') && idx + 1 < lines.len() {
+                let next_line = lines[idx + 1].trim();
+
+                if self.is_table_delimiter(next_line) {
+                    self.flush_paragraph(&mut blocks, &mut cur_paragraph_lines);
+                    if !cur_quoto_lines.is_empty() {
+                        self.flush_blockquote(&mut blocks, &mut cur_quoto_lines);
+                    }
+                    if !cur_list_lines.is_empty() {
+                        self.flush_list_block(&mut blocks, &mut cur_list_lines);
+                    }
+
+                    let headers = self.parse_table_row(trimmed_line);
+                    let alignments = self.parse_table_alignments(next_line);
+
+                    let mut rows = Vec::new();
+                    idx += 2;
+
+                    while idx < lines.len() {
+                        let row_line = lines[idx].trim();
+
+                        if !row_line.contains('|') || row_line.is_empty() {
+                            break;
+                        }
+
+                        rows.push(self.parse_table_row(row_line));
+                        idx += 1;
+                    }
+
+                    blocks.push(Block::Table {
+                        headers,
+                        rows,
+                        alignments,
+                    });
+                    continue;
+                }
             }
 
             // === ThematicBreak ===
             if self.is_thematic_break(line) {
                 self.flush_paragraph(&mut blocks, &mut cur_paragraph_lines);
+
                 if !cur_quoto_lines.is_empty() {
                     self.flush_blockquote(&mut blocks, &mut cur_quoto_lines);
                 }
+                if !cur_list_lines.is_empty() {
+                    self.flush_list_block(&mut blocks, &mut cur_list_lines);
+                }
 
                 blocks.push(Block::ThematicBreak);
+                idx += 1;
                 continue;
             }
 
@@ -250,20 +368,21 @@ impl Parser {
                     || trimmed_line.starts_with('`')
                 {
                     self.flush_list_block(&mut blocks, &mut cur_list_lines);
-                }
-
-                if trimmed_line.is_empty() {
+                } else if trimmed_line.is_empty() {
                     cur_list_lines.push(line.to_string());
+
+                    idx += 1;
                     continue;
                 }
-
                 // 如果是列表标记有缩进，继续收集
-                if is_marker || is_indented {
+                else if is_marker || is_indented {
                     cur_list_lines.push(line.to_string());
-                    continue;
-                }
 
-                self.flush_list_block(&mut blocks, &mut cur_list_lines);
+                    idx += 1;
+                    continue;
+                } else {
+                    self.flush_list_block(&mut blocks, &mut cur_list_lines);
+                }
             }
 
             if self.parse_list_marker(trimmed_line).is_some() {
@@ -278,6 +397,8 @@ impl Parser {
                 // }
 
                 cur_list_lines.push(line.to_string());
+
+                idx += 1;
                 continue;
             }
 
@@ -286,6 +407,8 @@ impl Parser {
                 self.flush_paragraph(&mut blocks, &mut cur_paragraph_lines);
                 let content = trimmed_line.strip_prefix('>').unwrap_or("").trim_start();
                 cur_quoto_lines.push(content.to_string());
+
+                idx += 1;
                 continue;
             }
 
@@ -296,6 +419,8 @@ impl Parser {
             // === Empty ===
             if trimmed_line.is_empty() {
                 self.flush_paragraph(&mut blocks, &mut cur_paragraph_lines);
+
+                idx += 1;
                 continue;
             }
 
@@ -303,9 +428,14 @@ impl Parser {
             if let Some(heading) = self.parse_heading(trimmed_line) {
                 self.flush_paragraph(&mut blocks, &mut cur_paragraph_lines);
                 blocks.push(heading);
-            } else {
-                cur_paragraph_lines.push(trimmed_line.to_string());
+
+                idx += 1;
+                continue;
             }
+
+            // === Paragraph ===
+            cur_paragraph_lines.push(trimmed_line.to_string());
+            idx += 1;
         }
 
         // 处理缓存

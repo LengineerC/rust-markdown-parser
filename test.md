@@ -78,3 +78,10 @@ Ordered Nesting:
    1. Sub-step 1.1
    3. Sub-step 1.2
 2. Step 2
+# Table Test
+
+| Name | Age | Role |Gender|
+| :--- | :--: | ---: |---|
+| Alice | 24 | **Dev** |F|
+| Bob | 30 | Manager |M|
+| Charlie | 28 | *Designer* | M |

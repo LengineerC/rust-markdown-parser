@@ -49,6 +49,49 @@ impl HtmlRenderer {
 
                 format!("<{}>\n{}</{}>", tag, content, tag)
             }
+            Block::Table {
+                headers,
+                rows,
+                alignments,
+            } => {
+                let mut html = String::from("<table>\n");
+
+                // 表头
+                html.push_str("<thead>\n<tr>\n");
+                for (i, header_cell) in headers.iter().enumerate() {
+                    let align = alignments.get(i).unwrap_or(&Alignment::None);
+                    let style = match align {
+                        Alignment::Left => " style=\"text-align: left\"",
+                        Alignment::Center => " style=\"text-align: center\"",
+                        Alignment::Right => " style=\"text-align: right\"",
+                        Alignment::None => "",
+                    };
+                    let content = Self::render_inlines(header_cell);
+                    html.push_str(&format!("<th{}>{}</th>\n", style, content));
+                }
+                html.push_str("</tr>\n</thead>\n");
+
+                // 表体
+                html.push_str("<tbody>\n");
+                for row in rows {
+                    html.push_str("<tr>\n");
+                    for (i, cell) in row.iter().enumerate() {
+                        let align = alignments.get(i).unwrap_or(&Alignment::None);
+                        let style = match align {
+                            Alignment::Left => " style=\"text-align: left\"",
+                            Alignment::Center => " style=\"text-align: center\"",
+                            Alignment::Right => " style=\"text-align: right\"",
+                            Alignment::None => "",
+                        };
+                        let content = Self::render_inlines(cell);
+                        html.push_str(&format!("<td{}>{}</td>\n", style, content));
+                    }
+                    html.push_str("</tr>\n");
+                }
+                html.push_str("</tbody>\n</table>");
+
+                html
+            }
         }
     }
 
