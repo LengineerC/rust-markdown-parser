@@ -3,20 +3,20 @@ use crate::{
     lexer::InlineParser,
 };
 
-pub struct ListParser {
-    lines: Vec<String>,
+pub struct ListParser<'a> {
+    lines: Vec<&'a str>,
     pos: usize,
 }
 
-impl ListParser {
-    pub fn new(lines: &[String]) -> Self {
+impl<'a> ListParser<'a> {
+    pub fn new(lines: &[&'a str]) -> Self {
         ListParser {
             lines: lines.to_vec(),
             pos: 0,
         }
     }
 
-    pub fn parse(&mut self) -> Vec<Block> {
+    pub fn parse(&mut self) -> Vec<Block<'a>> {
         let mut blocks = Vec::new();
         while self.pos < self.lines.len() {
             if let Some(block) = self.parse_list(0) {
@@ -29,7 +29,7 @@ impl ListParser {
         blocks
     }
 
-    fn parse_list(&mut self, min_indent: usize) -> Option<Block> {
+    fn parse_list(&mut self, min_indent: usize) -> Option<Block<'a>> {
         if self.pos >= self.lines.len() {
             return None;
         }
@@ -69,7 +69,7 @@ impl ListParser {
                     self.pos += 1;
 
                     // 1. 提取当前行的内容
-                    let content_text = line.trim()[start..].trim().to_string();
+                    let content_text = line.trim()[start..].trim();
                     let mut item_children = Vec::new();
 
                     let mut inline_parser = InlineParser::new(&content_text);

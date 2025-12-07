@@ -2,7 +2,7 @@ mod ast;
 mod lexer;
 mod renderer;
 
-use std::{env, error::Error, fs, time::Instant};
+use std::{env, fs, time::Instant};
 
 use lexer::Parser;
 
@@ -17,28 +17,28 @@ use crate::renderer::HtmlRenderer;
 // loop 4 cost: 58.3078ms
 // ================================
 // Average cost: 86.1383ms
-// 
+//
 // dev
-// total cost: 383.3889ms
+// total cost: 313.9141ms
 // ================================
-// loop 0 cost: 75.4211ms
-// loop 1 cost: 77.7203ms
-// loop 2 cost: 80.9819ms
-// loop 3 cost: 74.4916ms
-// loop 4 cost: 74.774ms
+// loop 0 cost: 63.2594ms
+// loop 1 cost: 60.8249ms
+// loop 2 cost: 69.72ms
+// loop 3 cost: 61.4909ms
+// loop 4 cost: 58.6189ms
 // ================================
-// Average cost: 76.67778ms
-// 
+// Average cost: 62.78282ms
+//
 // release
-// total cost: 123.2115ms
+// total cost: 95.2053ms
 // ================================
-// loop 0 cost: 24.461ms
-// loop 1 cost: 26.0559ms
-// loop 2 cost: 23.8037ms
-// loop 3 cost: 24.2078ms
-// loop 4 cost: 24.6831ms
+// loop 0 cost: 18.7684ms
+// loop 1 cost: 18.3859ms
+// loop 2 cost: 18.5061ms
+// loop 3 cost: 18.7554ms
+// loop 4 cost: 20.7895ms
 // ================================
-// Average cost: 24.6423ms
+// Average cost: 19.04106ms
 //
 // pulldown-mark (dev)
 // total cost: 148.8262ms
@@ -55,10 +55,12 @@ fn performace_test() {
     let mut costs: Vec<u128> = Vec::new();
 
     let cwd = env::current_dir().unwrap();
-    let md_path = cwd.join("test.md");
+    let md_path = cwd.join("performance.md");
 
     let md_bytes = fs::read(md_path).unwrap();
-    let md_string = String::from_utf8(md_bytes).unwrap();
+    let mut md_string = String::from_utf8(md_bytes).unwrap();
+    
+    md_string = Parser::preprocess(&md_string);
 
     let mut parser = Parser::new(&md_string);
 
@@ -85,13 +87,14 @@ fn performace_test() {
     );
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let cwd = env::current_dir()?;
+fn output_test() {
+    let cwd = env::current_dir().unwrap();
     let md_path = cwd.join("test.md");
     let html_path = cwd.join("test.html");
 
-    let md_bytes = fs::read(md_path)?;
-    let md_string = String::from_utf8(md_bytes)?;
+    let md_bytes = fs::read(md_path).unwrap();
+    let mut md_string = String::from_utf8(md_bytes).unwrap();
+    md_string = Parser::preprocess(&md_string);
 
     let mut p = Parser::new(&md_string);
     let ast = p.parse();
@@ -113,9 +116,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         html
     );
 
-    fs::write(html_path, full_html)?;
+    fs::write(html_path, full_html).unwrap();
+}
 
+fn main() {
+    output_test();
     performace_test();
-
-    Ok(())
 }
