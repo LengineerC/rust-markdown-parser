@@ -2,7 +2,7 @@ mod ast;
 mod lexer;
 mod renderer;
 
-use std::{env, error::Error, fs, time::Instant};
+use std::{env, fs, time::Instant};
 
 use lexer::Parser;
 
@@ -13,16 +13,19 @@ fn performace_test() {
     let mut costs: Vec<u128> = Vec::new();
 
     let cwd = env::current_dir().unwrap();
-    let md_path = cwd.join("test.md");
+    let md_path = cwd.join("performance.md");
 
     let md_bytes = fs::read(md_path).unwrap();
     let md_string = String::from_utf8(md_bytes).unwrap();
+    
+    let formated_md_string = Parser::preprocess(&md_string);
 
-    let mut parser = Parser::new(&md_string);
+    let mut parser = Parser::new(&formated_md_string);
 
     for _ in 0..loop_time {
         let start_time = Instant::now();
-
+        
+        Parser::preprocess(&md_string);
         HtmlRenderer::render(&parser.parse());
 
         let duration = start_time.elapsed();
@@ -43,13 +46,14 @@ fn performace_test() {
     );
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let cwd = env::current_dir()?;
+fn output_test() {
+    let cwd = env::current_dir().unwrap();
     let md_path = cwd.join("test.md");
     let html_path = cwd.join("test.html");
 
-    let md_bytes = fs::read(md_path)?;
-    let md_string = String::from_utf8(md_bytes)?;
+    let md_bytes = fs::read(md_path).unwrap();
+    let mut md_string = String::from_utf8(md_bytes).unwrap();
+    md_string = Parser::preprocess(&md_string);
 
     let mut p = Parser::new(&md_string);
     let ast = p.parse();
@@ -71,9 +75,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         html
     );
 
-    fs::write(html_path, full_html)?;
+    fs::write(html_path, full_html).unwrap();
+}
 
+fn main() {
+    output_test();
     performace_test();
-
-    Ok(())
 }
