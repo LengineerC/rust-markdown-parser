@@ -17,14 +17,14 @@ fn performace_test() {
 
     let md_bytes = fs::read(md_path).unwrap();
     let md_string = String::from_utf8(md_bytes).unwrap();
-    
+
     let formated_md_string = Parser::preprocess(&md_string);
 
     let mut parser = Parser::new(&formated_md_string);
 
     for _ in 0..loop_time {
         let start_time = Instant::now();
-        
+
         Parser::preprocess(&md_string);
         HtmlRenderer::render(&parser.parse());
 

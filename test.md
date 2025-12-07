@@ -65,6 +65,10 @@ Mixed (Should break list):
 2. Item B (New list)
 - Item A
 1. Item C (New list)
+  *Item* Paragraph
+
+---
+  dsajdsa
 
 # Nested List Test
 
@@ -81,6 +85,14 @@ Ordered Nesting:
    1. Sub-step 1.1
    3. Sub-step 1.2
 2. Step 2
+
+> Level 1 BlockQuote
+>
+> > Level 2 Nested BlockQuote
+> > containing **bold** text.
+>
+> Back to Level 1.
+
 # Table Test
 
 | Name    |  Age  |       Role | Gender |

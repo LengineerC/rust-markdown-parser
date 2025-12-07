@@ -1,5 +1,7 @@
+use std::borrow::Cow;
+
 use crate::{
-    ast::{Block, ListItem},
+    ast::{Block, Inline, ListItem},
     lexer::InlineParser,
 };
 
@@ -35,7 +37,7 @@ impl<'a> ListParser<'a> {
         }
 
         // 1. 检查当前行是否是列表项，且缩进达标
-        let line = &self.lines[self.pos];
+        let line = self.lines[self.pos];
         let indent = self.count_indent(line);
 
         // 缩进变小返回
@@ -72,10 +74,10 @@ impl<'a> ListParser<'a> {
                     let content_text = line.trim()[start..].trim();
                     let mut item_children = Vec::new();
 
+                    let mut paragraph_children: Vec<Inline> = Vec::new();
+
                     let mut inline_parser = InlineParser::new(&content_text);
-                    item_children.push(Block::Paragraph {
-                        children: inline_parser.parse(),
-                    });
+                    paragraph_children.extend(inline_parser.parse());
 
                     // 2. 贪婪解析属于该 Item 的后续行 (子列表或多行内容)
                     // 子列表的缩进必须 > 当前 indent
@@ -97,8 +99,11 @@ impl<'a> ListParser<'a> {
                             if let Some(sub_list) = self.parse_list(next_indent) {
                                 item_children.push(sub_list);
                             } else {
-                                // 如果不是子列表（可能是多行文本），暂时忽略或当文本处理
-                                // 这里简化：只处理子列表，忽略多行文本拼接
+                                let line = &self.lines[self.pos].trim();
+                                let mut inline_parser = InlineParser::new(&line);
+                                paragraph_children.push(Inline::Text(Cow::from(" ")));
+                                paragraph_children.extend(inline_parser.parse());
+
                                 self.pos += 1;
                             }
                         } else {
@@ -106,6 +111,10 @@ impl<'a> ListParser<'a> {
                             break;
                         }
                     }
+
+                    item_children.push(Block::Paragraph {
+                        children: paragraph_children,
+                    });
 
                     items.push(ListItem {
                         children: item_children,
