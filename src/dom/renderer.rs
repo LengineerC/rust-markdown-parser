@@ -1,4 +1,4 @@
-use crate::ast::*;
+use crate::dom::ast::*;
 
 pub struct HtmlRenderer;
 

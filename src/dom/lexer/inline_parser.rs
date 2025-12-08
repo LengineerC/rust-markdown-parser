@@ -1,4 +1,4 @@
-use crate::ast::Inline;
+use crate::dom::ast::Inline;
 use std::borrow::Cow;
 
 pub struct InlineParser<'a> {

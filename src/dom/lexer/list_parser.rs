@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{
+use crate::dom::{
     ast::{Block, Inline, ListItem},
     lexer::InlineParser,
 };
